@@ -111,6 +111,54 @@ func TestNodeAPI(t *testing.T) {
 				})
 			})
 
+			Convey("When the node has used dev-nonces", func() {
+				devEUI := lorawan.EUI64{8, 7, 6, 5, 4, 3, 2, 1}
+				n, err := storage.GetNode(db, devEUI)
+				So(err, ShouldBeNil)
+				n.UsedDevNonces = storage.DevNonceList{
+					{1, 2},
+					{3, 4},
+				}
+				So(storage.UpdateNode(db, n), ShouldBeNil)
+
+				Convey("When updating with the same AppKey", func() {
+					_, err := api.Update(ctx, &pb.UpdateNodeRequest{
+						ApplicationID: app.ID,
+						DevEUI:        "0807060504030201",
+						Name:          "test-node-updated",
+						Description:   "test node description updated",
+						AppEUI:        "0102030405060708",
+						AppKey:        "01020304050607080102030405060708",
+					})
+					So(err, ShouldBeNil)
+
+					Convey("Then the used dev-nonces are kept", func() {
+						n, err := storage.GetNode(db, devEUI)
+						So(err, ShouldBeNil)
+						So(n.UsedDevNonces, ShouldResemble, storage.DevNonceList{{1, 2}, {3, 4}})
+					})
+				})
+
+				Convey("When updating with a different AppKey", func() {
+					_, err := api.Update(ctx, &pb.UpdateNodeRequest{
+						ApplicationID: app.ID,
+						DevEUI:        "0807060504030201",
+						Name:          "test-node-updated",
+						Description:   "test node description updated",
+						AppEUI:        "0102030405060708",
+						AppKey:        "08070605040302010807060504030201",
+					})
+					So(err, ShouldBeNil)
+
+					Convey("Then the used dev-nonces are removed", func() {
+						n, err := storage.GetNode(db, devEUI)
+						So(err, ShouldBeNil)
+						So(n.UsedDevNonces, ShouldHaveLength, 0)
+					})
+				})
+
+			})
+
 			Convey("Then listing the nodes for the application returns a single items", func() {
 				nodes, err := api.ListByApplicationID(ctx, &pb.ListNodeByApplicationIDRequest{
 					ApplicationID: app.ID,

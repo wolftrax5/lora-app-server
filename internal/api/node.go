@@ -138,7 +138,7 @@ func (a *NodeAPI) ListByApplicationID(ctx context.Context, req *pb.ListNodeByApp
 	return a.returnList(count, nodes)
 }
 
-// Update updates the node matching the given name.
+// Update updates the node matching the given DevEUI.
 func (a *NodeAPI) Update(ctx context.Context, req *pb.UpdateNodeRequest) (*pb.UpdateNodeResponse, error) {
 	var appEUI, devEUI lorawan.EUI64
 	var appKey lorawan.AES128Key
@@ -161,6 +161,11 @@ func (a *NodeAPI) Update(ctx context.Context, req *pb.UpdateNodeRequest) (*pb.Up
 	node, err := storage.GetNode(a.ctx.DB, devEUI)
 	if err != nil {
 		return nil, errToRPCError(err)
+	}
+
+	// in case of application key change, clear all used dev-nonces
+	if node.AppKey != appKey {
+		node.UsedDevNonces = nil
 	}
 
 	node.Name = req.Name
